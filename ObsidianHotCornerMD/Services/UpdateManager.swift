@@ -211,73 +211,84 @@ class UpdateManager: NSObject, ObservableObject {
 
     private func prepareDMGInstall(dmgPath: URL) -> InstallResult {
         let fileManager = FileManager.default
+        let mountPoint = fileManager.temporaryDirectory
+            .appendingPathComponent("ObsidianHotCornerMDMount-\(UUID().uuidString)", isDirectory: true)
 
         // Step 1: Strip quarantine from DMG
-        _ = shell("xattr -cr '\(dmgPath.path)'")
+        _ = shell("xattr -cr \(shellQuote(dmgPath.path))")
 
-        // Step 2: Mount DMG with explicit device output
-        let attachOutput = shell("hdiutil attach -nobrowse -noverify '\(dmgPath.path)'")
+        do {
+            try fileManager.createDirectory(at: mountPoint, withIntermediateDirectories: true)
+        } catch {
+            return .failure(error: error.localizedDescription)
+        }
+
+        // Step 2: Mount DMG at a unique path so existing mounted DMGs cannot be mistaken for the update.
+        let attachOutput = shell(
+            "hdiutil attach -nobrowse -noverify -mountpoint \(shellQuote(mountPoint.path)) \(shellQuote(dmgPath.path))"
+        )
         guard attachOutput.ok else {
+            try? fileManager.removeItem(at: mountPoint)
             return .failure(error: String(format: NSLocalizedString("error.mountDMG", comment: "Failed to mount DMG file. Output: %@"), attachOutput.output))
         }
 
-        // Step 3: Parse device and mount point from output
+        // Step 3: Parse device from output. The mount point is the unique path we provided.
         var devicePath: String?
-        var volumePath: String?
-
         let lines = attachOutput.output.components(separatedBy: "\n").filter { !$0.isEmpty }
-        for line in lines.reversed() {
-            if line.contains("/Volumes/") {
-                let fields = line.components(separatedBy: .whitespacesAndNewlines).filter { !$0.isEmpty }
-                if fields.count >= 2,
-                   fields[0].hasPrefix("/dev/"),
-                   let volPath = fields.last(where: { $0.hasPrefix("/Volumes/") }) {
+        for line in lines {
+            let fields = line.components(separatedBy: .whitespacesAndNewlines).filter { !$0.isEmpty }
+            if let first = fields.first, first.hasPrefix("/dev/") {
+                if devicePath == nil || line.contains(mountPoint.path) {
                     devicePath = fields[0]
-                    volumePath = volPath
-                    break
                 }
             }
         }
 
-        guard let device = devicePath, let volume = volumePath else {
-            _ = shell("hdiutil detach '\(dmgPath.path)' -force 2>/dev/null || true")
+        guard let device = devicePath else {
+            _ = shell("hdiutil detach \(shellQuote(mountPoint.path)) -force 2>/dev/null || true")
+            try? fileManager.removeItem(at: mountPoint)
             return .failure(error: String(format: NSLocalizedString("error.parseMount", comment: "Could not parse mount point. Output: %@"), attachOutput.output))
         }
 
         // Step 4: Find app bundle in mounted volume
         var appInDMG: String?
-        if let contents = try? fileManager.contentsOfDirectory(atPath: volume) {
+        if let contents = try? fileManager.contentsOfDirectory(atPath: mountPoint.path) {
             for item in contents {
                 if item.hasSuffix(".app") {
-                    appInDMG = (volume as NSString).appendingPathComponent(item)
+                    appInDMG = mountPoint.appendingPathComponent(item).path
                     break
                 }
             }
         }
 
         guard let sourceApp = appInDMG else {
-            _ = shell("hdiutil detach '\(device)' -force")
+            _ = shell("hdiutil detach \(shellQuote(device)) -force")
+            try? fileManager.removeItem(at: mountPoint)
             return .failure(error: NSLocalizedString("error.noAppInDMG", comment: "No app bundle found in DMG."))
         }
 
         // Step 5: Copy to temp location
-        let tempApp = "/tmp/ObsidianHotCornerMD-new.app"
-        _ = shell("rm -rf '\(tempApp)'")
-        let copyOutput = shell("cp -R '\(sourceApp)' '\(tempApp)'")
+        let tempApp = fileManager.temporaryDirectory
+            .appendingPathComponent("ObsidianHotCornerMD-new-\(UUID().uuidString).app")
+            .path
+        _ = shell("rm -rf \(shellQuote(tempApp))")
+        let copyOutput = shell("cp -R \(shellQuote(sourceApp)) \(shellQuote(tempApp))")
         guard copyOutput.ok else {
-            _ = shell("hdiutil detach '\(device)' -force")
+            _ = shell("hdiutil detach \(shellQuote(device)) -force")
+            try? fileManager.removeItem(at: mountPoint)
             return .failure(error: NSLocalizedString("error.copyAppFailed", comment: "Failed to copy app from DMG."))
         }
 
         // Step 6: Strip quarantine from copied app
-        _ = shell("xattr -cr '\(tempApp)'")
-        _ = shell("xattr -d com.apple.quarantine '\(tempApp)' 2>/dev/null || true")
+        _ = shell("xattr -cr \(shellQuote(tempApp))")
+        _ = shell("xattr -d com.apple.quarantine \(shellQuote(tempApp)) 2>/dev/null || true")
 
         // Step 7: Unmount DMG
-        let detachOutput = shell("hdiutil detach '\(device)' -force")
+        let detachOutput = shell("hdiutil detach \(shellQuote(device)) -force")
         if !detachOutput.ok {
             print("Warning: Failed to detach DMG device \(device): \(detachOutput.output)")
         }
+        try? fileManager.removeItem(at: mountPoint)
 
         return .success(tempApp: tempApp)
     }
@@ -290,6 +301,9 @@ class UpdateManager: NSObject, ObservableObject {
         UserDefaults.standard.synchronize()
 
         // Improved relaunch script with longer wait and explicit process termination
+        let quotedBundlePath = shellQuote(bundlePath)
+        let quotedTempApp = shellQuote(tempApp)
+
         let script = """
         # Wait for app to terminate gracefully (poll up to 10 seconds)
         for i in {1..20}; do
@@ -308,14 +322,14 @@ class UpdateManager: NSObject, ObservableObject {
         fi
 
         # Replace old app with new
-        rm -rf '\(bundlePath)'
-        mv '\(tempApp)' '\(bundlePath)'
+        rm -rf \(quotedBundlePath)
+        mv \(quotedTempApp) \(quotedBundlePath)
 
         # Final quarantine strip
-        xattr -cr '\(bundlePath)'
+        xattr -cr \(quotedBundlePath)
 
         # Launch new version
-        open '\(bundlePath)'
+        open \(quotedBundlePath)
         """
 
         let task = Process()
@@ -339,6 +353,10 @@ class UpdateManager: NSObject, ObservableObject {
         let data = pipe.fileHandleForReading.readDataToEndOfFile()
         let output = String(data: data, encoding: .utf8) ?? ""
         return (output.trimmingCharacters(in: .whitespacesAndNewlines), process.terminationStatus == 0)
+    }
+
+    private func shellQuote(_ value: String) -> String {
+        "'\(value.replacingOccurrences(of: "'", with: "'\\''"))'"
     }
 }
 

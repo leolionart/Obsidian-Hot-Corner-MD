@@ -16,3 +16,8 @@
 - Added local mouse tracking while the Quick Note window is focused.
 - Fixed dismissed Quick Notes getting stuck in the active hot-corner state.
 - Added Escape handling from the Quick Note window and editor.
+
+## v1.0.6-quicknote
+
+- Fixed in-app update installing an older app when older DMGs were still mounted.
+- Mounted update DMGs at a unique temporary path instead of parsing `/Volumes/ObsidianHotCornerMD*`.
