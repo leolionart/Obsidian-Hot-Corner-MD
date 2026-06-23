@@ -21,3 +21,10 @@
 
 - Fixed in-app update installing an older app when older DMGs were still mounted.
 - Mounted update DMGs at a unique temporary path instead of parsing `/Volumes/ObsidianHotCornerMD*`.
+
+## v1.0.7-quicknote
+
+- Fixed the missing Quick Note word count localization.
+- Routed Cancel, Save, and Escape through the same dismiss path used by the working status-item close flow.
+- Added an Escape key monitor and fallback forced order-out after dismiss.
+- Made Preview Width and Preview Lines control the Quick Note window size.

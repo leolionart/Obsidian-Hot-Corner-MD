@@ -27,6 +27,7 @@
 "quicknote.save" = "Save";
 "quicknote.placeholder" = "Type your note here...";
 "quicknote.destination" = "Destination";
+"quicknote.wordCount" = "%d words";
 "quicknote.pasteHint" = "Paste images with Cmd+V";
 "quicknote.imagePasteFailed" = "Failed to paste image: %@";
 "quicknote.saveFailed" = "Failed to save quick note: %@";

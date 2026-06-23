@@ -14,10 +14,19 @@ class PreviewWindow: NSWindow {
 
     override func cancelOperation(_ sender: Any?) {
         if settings.quickNoteMode, let appDelegate = NSApp.delegate as? AppDelegate {
-            appDelegate.hidePreviewWindow()
+            appDelegate.dismissQuickNoteWindow()
         } else {
             super.cancelOperation(sender)
         }
+    }
+
+    override func keyDown(with event: NSEvent) {
+        if settings.quickNoteMode, event.keyCode == 53, let appDelegate = NSApp.delegate as? AppDelegate {
+            appDelegate.dismissQuickNoteWindow()
+            return
+        }
+
+        super.keyDown(with: event)
     }
 
     func resetQuickNoteText() {
@@ -73,7 +82,8 @@ class PreviewWindow: NSWindow {
         // Compute content height
         let height: CGFloat
         if settings.quickNoteMode {
-            height = 540
+            let editorHeight = max(Constants.quickNoteMinimumEditorHeight, CGFloat(maxLines) * Constants.quickNoteLineHeight)
+            height = editorHeight + Constants.quickNoteChromeHeight
         } else {
             let lineHeight: CGFloat = 17
             let rawHeight = CGFloat(maxLines) * lineHeight + 2 * Constants.textPadding
@@ -88,7 +98,7 @@ class PreviewWindow: NSWindow {
         guard let screen = currentScreen else { return }
         let sf = screen.visibleFrame
         let padding = Constants.scrollPadding
-        let width = settings.quickNoteMode ? max(CGFloat(settings.previewWidth), 760) : CGFloat(settings.previewWidth)
+        let width = settings.quickNoteMode ? max(CGFloat(settings.previewWidth), Constants.quickNoteMinimumWidth) : CGFloat(settings.previewWidth)
         let x: CGFloat, y: CGFloat
         switch corner {
         case .topLeft:
@@ -160,5 +170,6 @@ class PreviewWindow: NSWindow {
         contentView?.layer?.removeAllAnimations()
         alphaValue = 0
         orderOut(nil)
+        resignKey()
     }
 }

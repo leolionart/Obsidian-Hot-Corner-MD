@@ -7,6 +7,10 @@ struct Constants {
     static var cornerZone: CGFloat = smallZone
     
     static let previewWidth: CGFloat = 400
+    static let quickNoteMinimumWidth: CGFloat = 360
+    static let quickNoteMinimumEditorHeight: CGFloat = 160
+    static let quickNoteLineHeight: CGFloat = 24
+    static let quickNoteChromeHeight: CGFloat = 154
     static let cornerRadius: CGFloat = 10
     static let scrollPadding: CGFloat = 12    // padding around the scroll view
     static let textPadding: CGFloat = 6

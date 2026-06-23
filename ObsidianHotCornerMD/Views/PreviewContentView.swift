@@ -7,7 +7,11 @@ struct PreviewContentView: View {
     let settings: SettingsModel
 
     private var contentWidth: CGFloat {
-        settings.quickNoteMode ? max(CGFloat(settings.previewWidth), 760) : CGFloat(settings.previewWidth)
+        settings.quickNoteMode ? max(CGFloat(settings.previewWidth), Constants.quickNoteMinimumWidth) : CGFloat(settings.previewWidth)
+    }
+
+    private var quickNoteEditorHeight: CGFloat {
+        max(Constants.quickNoteMinimumEditorHeight, CGFloat(settings.previewLines) * Constants.quickNoteLineHeight)
     }
 
     var body: some View {
@@ -70,7 +74,7 @@ struct PreviewContentView: View {
                             .allowsHitTesting(false)
                     }
                 }
-                .frame(maxWidth: .infinity, minHeight: 380, maxHeight: .infinity)
+                .frame(maxWidth: .infinity, minHeight: quickNoteEditorHeight, maxHeight: .infinity)
                 .background(Color(red: 31.0/255.0, green: 33.0/255.0, blue: 38.0/255.0))
                 .clipShape(RoundedRectangle(cornerRadius: 9, style: .continuous))
                 .overlay(
@@ -206,7 +210,7 @@ struct PreviewContentView: View {
     private func cancelQuickNote() {
         viewModel.quickNoteError = nil
         if let appDelegate = NSApp.delegate as? AppDelegate {
-            appDelegate.hidePreviewWindow()
+            appDelegate.dismissQuickNoteWindow()
         }
     }
 
@@ -220,7 +224,7 @@ struct PreviewContentView: View {
             viewModel.quickNoteError = nil
 
             if let appDelegate = NSApp.delegate as? AppDelegate {
-                appDelegate.hidePreviewWindow()
+                appDelegate.dismissQuickNoteWindow()
             }
 
             if settings.openOnClick, let obsidianURL = savedFileURL.obsidianOpenURL {
@@ -389,10 +393,19 @@ final class MarkdownNSTextView: NSTextView {
 
     override func cancelOperation(_ sender: Any?) {
         if let appDelegate = NSApp.delegate as? AppDelegate {
-            appDelegate.hidePreviewWindow()
+            appDelegate.dismissQuickNoteWindow()
         } else {
             super.cancelOperation(sender)
         }
+    }
+
+    override func keyDown(with event: NSEvent) {
+        if event.keyCode == 53, let appDelegate = NSApp.delegate as? AppDelegate {
+            appDelegate.dismissQuickNoteWindow()
+            return
+        }
+
+        super.keyDown(with: event)
     }
 
     override func insertNewline(_ sender: Any?) {

@@ -18,6 +18,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, HotCornerDelegate {
 
     private var previewWindow: PreviewWindow!
     private var hideTimer: Timer?
+    private var keyMonitor: Any?
     private var suppressQuickNoteUntilCornerExit = false
     private var suppressQuickNoteUntil = Date.distantPast
     // Cache file contents to avoid re-reading during animations
@@ -77,6 +78,16 @@ class AppDelegate: NSObject, NSApplicationDelegate, HotCornerDelegate {
         // Start mouse movement monitor
         monitor.delegate = self
         monitor.start()
+        keyMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
+            guard let self else { return event }
+            if self.settings.quickNoteMode,
+               self.previewWindow.isVisible,
+               event.keyCode == 53 {
+                self.dismissQuickNoteWindow()
+                return nil
+            }
+            return event
+        }
 
         // Trigger update check silently on launch
         updateManager.checkForUpdatesSilently()
@@ -129,13 +140,20 @@ class AppDelegate: NSObject, NSApplicationDelegate, HotCornerDelegate {
     }
 
     func hidePreviewWindow() {
+        dismissQuickNoteWindow()
+    }
+
+    func dismissQuickNoteWindow() {
         if settings.quickNoteMode {
             suppressQuickNoteUntilCornerExit = true
-            suppressQuickNoteUntil = Date().addingTimeInterval(0.75)
+            suppressQuickNoteUntil = Date().addingTimeInterval(2.0)
             hideTimer?.invalidate()
             hideTimer = nil
         }
-        previewWindow.hideImmediately()
+        previewWindow.hide()
+        DispatchQueue.main.asyncAfter(deadline: .now() + Constants.fadeDuration + 0.05) { [weak self] in
+            self?.previewWindow.hideImmediately()
+        }
     }
 
     func showSettings() {
@@ -214,6 +232,9 @@ class AppDelegate: NSObject, NSApplicationDelegate, HotCornerDelegate {
     }
 
     func applicationWillTerminate(_ notification: Notification) {
+        if let keyMonitor {
+            NSEvent.removeMonitor(keyMonitor)
+        }
         monitor.stop()
         settings.saveSettings()
     }
