@@ -204,7 +204,6 @@ struct PreviewContentView: View {
     }
 
     private func cancelQuickNote() {
-        viewModel.quickNoteText = ""
         viewModel.quickNoteError = nil
         if let appDelegate = NSApp.delegate as? AppDelegate {
             appDelegate.hidePreviewWindow()
@@ -388,6 +387,24 @@ struct MarkdownEditingTextView: NSViewRepresentable {
 final class MarkdownNSTextView: NSTextView {
     var onPasteImage: ((NSImage) -> String?)?
 
+    override func insertNewline(_ sender: Any?) {
+        guard let listPrefix = continuedListPrefix() else {
+            super.insertNewline(sender)
+            return
+        }
+
+        if listPrefix.shouldExitList {
+            let range = listPrefix.currentMarkerRange
+            if shouldChangeText(in: range, replacementString: "") {
+                textStorage?.replaceCharacters(in: range, with: "")
+                didChangeText()
+            }
+            return
+        }
+
+        insertText("\n\(listPrefix.nextMarker)", replacementRange: selectedRange())
+    }
+
     override func paste(_ sender: Any?) {
         if let image = pasteboardImage(),
            let markdown = onPasteImage?(image) {
@@ -415,5 +432,100 @@ final class MarkdownNSTextView: NSTextView {
         }
 
         return nil
+    }
+
+    private struct ListContinuation {
+        let nextMarker: String
+        let currentMarkerRange: NSRange
+        let shouldExitList: Bool
+    }
+
+    private func continuedListPrefix() -> ListContinuation? {
+        let selection = selectedRange()
+        guard selection.length == 0 else { return nil }
+
+        let nsText = string as NSString
+        guard nsText.length > 0 else { return nil }
+
+        let cursor = min(selection.location, nsText.length)
+        let lineLookupLocation = max(0, min(cursor, nsText.length - 1))
+        let lineRange = nsText.lineRange(for: NSRange(location: lineLookupLocation, length: 0))
+        let lineText = nsText.substring(with: lineRange).trimmingCharacters(in: .newlines)
+
+        guard let marker = listMarker(in: lineText) else { return nil }
+
+        let markerLocation = lineRange.location + marker.leadingWhitespaceCount
+        let markerRange = NSRange(location: markerLocation, length: marker.markerLength)
+        let shouldExitList = lineText.dropFirst(marker.leadingWhitespaceCount + marker.markerLength)
+            .trimmingCharacters(in: .whitespaces)
+            .isEmpty
+
+        return ListContinuation(
+            nextMarker: marker.nextMarker,
+            currentMarkerRange: markerRange,
+            shouldExitList: shouldExitList
+        )
+    }
+
+    private struct ListMarker {
+        let leadingWhitespaceCount: Int
+        let markerLength: Int
+        let nextMarker: String
+    }
+
+    private func listMarker(in lineText: String) -> ListMarker? {
+        if let marker = regexListMarker(
+            in: lineText,
+            pattern: #"^(\s*)(-\s+\[[ xX]\]\s+)"#,
+            nextMarker: { "\($0[1])- [ ] " }
+        ) {
+            return marker
+        }
+
+        if let marker = regexListMarker(
+            in: lineText,
+            pattern: #"^(\s*)([-*]\s+)"#,
+            nextMarker: { "\($0[1])\($0[2])" }
+        ) {
+            return marker
+        }
+
+        return regexListMarker(
+            in: lineText,
+            pattern: #"^(\s*)(\d+)([.)]\s+)"#,
+            nextMarker: { groups in
+                let nextNumber = (Int(groups[2]) ?? 0) + 1
+                return "\(groups[1])\(nextNumber)\(groups[3])"
+            }
+        )
+    }
+
+    private func regexListMarker(
+        in lineText: String,
+        pattern: String,
+        nextMarker: ([String]) -> String
+    ) -> ListMarker? {
+        guard let regex = try? NSRegularExpression(pattern: pattern) else { return nil }
+        let nsLine = lineText as NSString
+        let range = NSRange(location: 0, length: nsLine.length)
+        guard let match = regex.firstMatch(in: lineText, range: range) else { return nil }
+
+        let groups = (0..<match.numberOfRanges).map { index -> String in
+            let groupRange = match.range(at: index)
+            guard groupRange.location != NSNotFound else { return "" }
+            return nsLine.substring(with: groupRange)
+        }
+
+        return ListMarker(
+            leadingWhitespaceCount: (groups[safe: 1] ?? "").count,
+            markerLength: match.range(at: 0).length - (groups[safe: 1] ?? "").count,
+            nextMarker: nextMarker(groups)
+        )
+    }
+}
+
+private extension Array {
+    subscript(safe index: Int) -> Element? {
+        indices.contains(index) ? self[index] : nil
     }
 }

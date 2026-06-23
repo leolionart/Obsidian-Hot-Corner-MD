@@ -152,7 +152,7 @@ struct SettingsView: View {
             SoftwareUpdateSection(updateManager: updateManager)
 
             Button {
-                if let url = URL(string: "https://github.com/nbox/ObsidianHotCornerMD") {
+                if let url = URL(string: "https://github.com/leolionart/Obsidian-Hot-Corner-MD") {
                     NSWorkspace.shared.open(url)
                 }
             } label: {
