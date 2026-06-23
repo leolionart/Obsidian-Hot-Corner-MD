@@ -3,25 +3,17 @@ import Foundation
 import KeyboardShortcuts
 import AppKit
 
-
 struct SettingsView: View {
     @ObservedObject var model: SettingsModel
+    @ObservedObject var updateManager: UpdateManager
     @State private var showingImporter = false
 
     private func screenWidth() -> Double {
         Double(NSScreen.main?.visibleFrame.width ?? 800)
     }
 
-
-    private let cornerColumns = [
-        GridItem(.flexible()),
-        GridItem(.flexible())
-    ]
-
     var body: some View {
-
         VStack(alignment: .leading, spacing: 20) {
-
             GroupBox(label: Label(LocalizedStringKey("settings.markdownFile"), systemImage: "doc.text")) {
                 HStack {
                     Text(model.fileURL?.pathRelativeToHome ?? NSLocalizedString("settings.none", comment: ""))
@@ -72,7 +64,6 @@ struct SettingsView: View {
             }
             .frame(maxWidth: .infinity)
 
-
             GroupBox(label: Label(LocalizedStringKey("settings.previewLines"), systemImage: "text.alignleft")) {
                 HStack {
                     Slider(
@@ -91,7 +82,6 @@ struct SettingsView: View {
             }
             .frame(maxWidth: .infinity)
 
-
             GroupBox(label: Label(LocalizedStringKey("settings.previewWidth"), systemImage: "arrow.left.and.right")) {
                 HStack {
                     Slider(
@@ -99,7 +89,7 @@ struct SettingsView: View {
                             get: { Double(model.previewWidth) },
                             set: { model.previewWidth = Int($0) }
                         ),
-                        in: 200...screenWidth(), // from 200px up to the screen width
+                        in: 200...screenWidth(),
                         step: 50
                     )
                     Text("\(model.previewWidth)")
@@ -109,7 +99,6 @@ struct SettingsView: View {
                 .frame(maxWidth: .infinity)
             }
             .frame(maxWidth: .infinity)
-
 
             GroupBox(label: Label(LocalizedStringKey("settings.hotCorners"), systemImage: "rectangle.portrait.inset.filled")) {
                 VStack(spacing: 10) {
@@ -131,7 +120,6 @@ struct SettingsView: View {
             }
             .frame(maxWidth: .infinity)
 
-
             GroupBox(label: Label(LocalizedStringKey("settings.behavior"), systemImage: "gearshape")) {
                 VStack(alignment: .leading) {
                     Toggle(LocalizedStringKey("settings.openInObsidian"), isOn: $model.openOnClick)
@@ -142,7 +130,6 @@ struct SettingsView: View {
                         HStack {
                             Text(LocalizedStringKey("settings.shortcut"))
                             KeyboardShortcuts.Recorder(for: .togglePreview)
-
                             Spacer()
                         }
                         .padding(.vertical, 5)
@@ -156,13 +143,13 @@ struct SettingsView: View {
                         .labelsHidden()
                         .padding(.vertical, 5)
                     }
-
-
                 }
                 .padding(.vertical, 5)
                 .frame(maxWidth: .infinity, alignment: .leading)
             }
             .frame(maxWidth: .infinity)
+
+            SoftwareUpdateSection(updateManager: updateManager)
 
             Button {
                 if let url = URL(string: "https://github.com/nbox/ObsidianHotCornerMD") {
@@ -183,7 +170,6 @@ struct SettingsView: View {
             }
             .buttonStyle(PlainButtonStyle())
 
-
             GroupBox {
                 Button(role: .destructive) {
                     NSApp.terminate(nil)
@@ -199,5 +185,127 @@ struct SettingsView: View {
         }
         .padding(20)
         .frame(minWidth: 350)
+    }
+}
+
+struct SoftwareUpdateSection: View {
+    @ObservedObject var updateManager: UpdateManager
+
+    var body: some View {
+        GroupBox(label: Label(LocalizedStringKey("settings.softwareUpdate"), systemImage: "arrow.clockwise.circle")) {
+            VStack(alignment: .leading, spacing: 10) {
+                HStack {
+                    Text(LocalizedStringKey("update.currentVersion"))
+                    Spacer()
+                    Text("v\(Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "Unknown")")
+                        .foregroundColor(.secondary)
+                }
+
+                if let lastCheck = updateManager.lastCheckDate {
+                    HStack {
+                        Text(LocalizedStringKey("update.lastChecked"))
+                        Spacer()
+                        Text(formatDate(lastCheck))
+                            .foregroundColor(.secondary)
+                    }
+                    .font(.footnote)
+                }
+
+                Divider()
+
+                switch updateManager.state {
+                case .idle, .upToDate, .error:
+                    VStack(alignment: .leading, spacing: 6) {
+                        Button(LocalizedStringKey("update.checkForUpdates")) {
+                            updateManager.checkForUpdates()
+                        }
+                        .disabled(updateManager.isCheckingForUpdates)
+
+                        if case .error(let message) = updateManager.state {
+                            Text(message)
+                                .font(.footnote)
+                                .foregroundColor(.red)
+                        } else if case .upToDate = updateManager.state {
+                            Text(LocalizedStringKey("update.upToDate"))
+                                .font(.footnote)
+                                .foregroundColor(.green)
+                        }
+                    }
+
+                case .checking:
+                    HStack(spacing: 8) {
+                        ProgressView()
+                            .scaleEffect(0.6)
+                            .frame(width: 18, height: 18)
+                        Text(LocalizedStringKey("update.checking"))
+                            .font(.footnote)
+                            .foregroundColor(.secondary)
+                    }
+
+                case .available(let info):
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text(String(format: NSLocalizedString("update.newAvailable", comment: ""), info.version))
+                            .font(.system(size: 13, weight: .semibold))
+
+                        if !info.releaseNotes.isEmpty {
+                            ScrollView {
+                                Text(info.releaseNotes)
+                                    .font(.footnote)
+                                    .frame(maxWidth: .infinity, alignment: .leading)
+                                    .padding(6)
+                            }
+                            .frame(maxHeight: 90)
+                            .background(Color(NSColor.controlBackgroundColor))
+                            .cornerRadius(4)
+                        }
+
+                        HStack {
+                            Button(LocalizedStringKey("update.downloadAndInstall")) {
+                                updateManager.downloadUpdate(info)
+                            }
+                            Spacer()
+                            Button(LocalizedStringKey("update.skip")) {
+                                updateManager.skipVersion(info.version)
+                            }
+                            .buttonStyle(BorderlessButtonStyle())
+                        }
+                    }
+
+                case .downloading(let progress):
+                    VStack(alignment: .leading, spacing: 6) {
+                        ProgressView(value: progress)
+                        HStack {
+                            Text(String(format: NSLocalizedString("update.downloading", comment: ""), Int(progress * 100)))
+                                .font(.footnote)
+                                .foregroundColor(.secondary)
+                            Spacer()
+                            Button(LocalizedStringKey("update.cancel")) {
+                                updateManager.cancelDownload()
+                            }
+                            .buttonStyle(BorderlessButtonStyle())
+                        }
+                    }
+
+                case .installing:
+                    HStack(spacing: 8) {
+                        ProgressView()
+                            .scaleEffect(0.6)
+                            .frame(width: 18, height: 18)
+                        Text(LocalizedStringKey("update.installing"))
+                            .font(.footnote)
+                            .foregroundColor(.secondary)
+                    }
+                }
+            }
+            .padding(.vertical, 5)
+            .frame(maxWidth: .infinity)
+        }
+        .frame(maxWidth: .infinity)
+    }
+
+    private func formatDate(_ date: Date) -> String {
+        let formatter = RelativeDateTimeFormatter()
+        formatter.unitsStyle = .short
+        return formatter.localizedString(for: date, relativeTo: Date())
     }
 }

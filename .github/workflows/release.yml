@@ -22,7 +22,7 @@ jobs:
       should_release: ${{ steps.check.outputs.should_release }}
     steps:
       - name: Checkout
-        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        uses: actions/checkout@v5
         with:
           fetch-depth: 0
 
@@ -85,9 +85,10 @@ jobs:
     env:
       VERSION: ${{ needs.version-check.outputs.version }}
       TAG_NAME: ${{ needs.version-check.outputs.tag }}
+      HOMEBREW_TAP_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
     steps:
       - name: Checkout
-        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        uses: actions/checkout@v5
 
       - name: Select Xcode
         run: |
@@ -106,6 +107,8 @@ jobs:
             -project ObsidianHotCornerMD.xcodeproj \
             -scheme ObsidianHotCornerMD \
             -configuration Release \
+            MARKETING_VERSION="${VERSION}" \
+            CURRENT_PROJECT_VERSION="${GITHUB_RUN_NUMBER}" \
             -destination 'generic/platform=macOS' \
             -archivePath build/ObsidianHotCornerMD.xcarchive \
             -quiet \
@@ -141,27 +144,32 @@ jobs:
 
       - name: Upload Release DMG
         if: needs.version-check.outputs.should_release == 'true'
-        uses: softprops/action-gh-release@de2c0eb89ae2a093876385947365aca7b0e5f844 # v1
-        with:
-          files: ${{ steps.dmg.outputs.dmg }}
-          tag_name: ${{ steps.dmg.outputs.tag_name }}
-          name: ${{ steps.dmg.outputs.release_name }}
-          draft: false
-          prerelease: false
-          generate_release_notes: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          DMG_PATH="${{ steps.dmg.outputs.dmg }}"
+          TAG_NAME="${{ steps.dmg.outputs.tag_name }}"
+          RELEASE_NAME="${{ steps.dmg.outputs.release_name }}"
+
+          if gh release view "$TAG_NAME" >/dev/null 2>&1; then
+            gh release upload "$TAG_NAME" "$DMG_PATH" --clobber
+          else
+            gh release create "$TAG_NAME" "$DMG_PATH" \
+              --title "$RELEASE_NAME" \
+              --generate-notes
+          fi
 
       - name: Checkout Homebrew tap
-        if: needs.version-check.outputs.should_release == 'true'
-        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        if: needs.version-check.outputs.should_release == 'true' && env.HOMEBREW_TAP_TOKEN != ''
+        uses: actions/checkout@v5
         with:
           repository: nbox/homebrew-tap
-          token: ${{ secrets.HOMEBREW_TAP_TOKEN }}
+          token: ${{ env.HOMEBREW_TAP_TOKEN }}
           path: tap
 
       - name: Update cask in tap repo
-        if: needs.version-check.outputs.should_release == 'true'
+        if: needs.version-check.outputs.should_release == 'true' && env.HOMEBREW_TAP_TOKEN != ''
         run: |
           set -euo pipefail
           VERSION="${{ needs.version-check.outputs.version }}"

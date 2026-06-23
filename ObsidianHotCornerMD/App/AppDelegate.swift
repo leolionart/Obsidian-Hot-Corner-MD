@@ -14,6 +14,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, HotCornerDelegate {
     var popover: NSPopover!
     let settings = SettingsModel()
     let monitor = HotCornerMonitor()
+    let updateManager = UpdateManager()
 
     private var previewWindow: PreviewWindow!
     private var hideTimer: Timer?
@@ -69,11 +70,23 @@ class AppDelegate: NSObject, NSApplicationDelegate, HotCornerDelegate {
         // Settings popover
         popover = NSPopover()
         popover.behavior = .transient
-        popover.contentViewController = NSHostingController(rootView: SettingsView(model: settings))
+        popover.contentViewController = NSHostingController(rootView: SettingsView(model: settings, updateManager: updateManager))
 
         // Start mouse movement monitor
         monitor.delegate = self
         monitor.start()
+
+        // Trigger update check silently on launch
+        updateManager.checkForUpdatesSilently()
+
+        // Reopen settings popover if relaunching from update install
+        if UserDefaults.standard.bool(forKey: "obsidianhotcornermd.reopenSettings") {
+            UserDefaults.standard.removeObject(forKey: "obsidianhotcornermd.reopenSettings")
+            UserDefaults.standard.synchronize()
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
+                self?.showSettings()
+            }
+        }
 
 
         KeyboardShortcuts.onKeyUp(for: .togglePreview) { [weak self] in

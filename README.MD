@@ -26,6 +26,7 @@ Quick Note Mode can turn the same hot-corner interaction into a capture window. 
 - **Quick Note Mode**: Choose a destination folder and create new timestamped Markdown notes from a hot-corner capture window.
 - **Keyboard Shortcut**: Assign a custom shortcut to toggle the preview on and off.
 - **Launch at Login**: Enable “Open at Login,” implemented via a Launch Agent (`~/Library/LaunchAgents`). The app will appear in System Settings → General → Login Items (you can disable it there).
+- **Auto-Updates**: Checks GitHub Releases for new updates, showing a "Software Update" settings section where you can download and install new versions with a single click.
 
 </details>
 
