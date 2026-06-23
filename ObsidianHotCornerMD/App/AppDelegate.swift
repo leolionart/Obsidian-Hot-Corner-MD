@@ -8,20 +8,20 @@ extension KeyboardShortcuts.Name {
 
 class AppDelegate: NSObject, NSApplicationDelegate, HotCornerDelegate {
     var statusItem: NSStatusItem!
-    
-    
-    
+
+
+
     var popover: NSPopover!
     let settings = SettingsModel()
     let monitor = HotCornerMonitor()
-    
+
     private var previewWindow: PreviewWindow!
     private var hideTimer: Timer?
     // Cache file contents to avoid re-reading during animations
     private var cachedText: String = ""
     private var cachedURL: URL?
     private var cachedMTime: Date?
-    
+
     private func loadContent() -> String {
         guard let url = settings.fileURL else {
             cachedURL = nil
@@ -50,68 +50,89 @@ class AppDelegate: NSObject, NSApplicationDelegate, HotCornerDelegate {
             return cachedText.isEmpty ? NSLocalizedString("error.badFile", comment: "") : cachedText
         }
     }
-    
+
     func applicationDidFinishLaunching(_ notification: Notification) {
         previewWindow = PreviewWindow(settings: settings)
-        // Hide Dock icon
-        NSApp.setActivationPolicy(.prohibited)
-        
+        // Hide Dock icon but allow window interaction
+        NSApp.setActivationPolicy(.accessory)
+
         // Create menu bar icon
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
-        
+
         if let btn = statusItem.button {
             btn.image = NSImage(systemSymbolName: "pencil", accessibilityDescription: "Settings")
             btn.action = #selector(toggleSettings(_:))
             btn.target = self
         }
-        
-        
+
+
         // Settings popover
         popover = NSPopover()
         popover.behavior = .transient
         popover.contentViewController = NSHostingController(rootView: SettingsView(model: settings))
-        
+
         // Start mouse movement monitor
         monitor.delegate = self
         monitor.start()
-        
-        
+
+
         KeyboardShortcuts.onKeyUp(for: .togglePreview) { [weak self] in
             guard let self = self, self.settings.shortcutEnabled else { return }
             let corner = self.settings.shortcutCorner
             if self.previewWindow.isVisible {
                 self.previewWindow.hide()
-            } else if self.settings.fileURL != nil {
-                let content = self.loadContent()
-                self.previewWindow.show(
-                    for: corner,
-                    content: content,
-                    maxLines: self.settings.previewLines,
-                    fileURL: self.settings.fileURL
-                )
+            } else {
+                if self.settings.quickNoteMode {
+                    if !self.previewWindow.isVisible {
+                        self.previewWindow.resetQuickNoteText()
+                    }
+                    self.previewWindow.show(
+                        for: corner,
+                        content: "",
+                        maxLines: self.settings.previewLines,
+                        fileURL: nil
+                    )
+                } else if self.settings.fileURL != nil {
+                    let content = self.loadContent()
+                    self.previewWindow.show(
+                        for: corner,
+                        content: content,
+                        maxLines: self.settings.previewLines,
+                        fileURL: self.settings.fileURL
+                    )
+                }
             }
         }
     }
-    
+
     @objc func toggleSettings(_ sender: Any?) {
-        guard let btn = statusItem.button else { return }
         if popover.isShown {
             popover.performClose(nil)
         } else {
-            NSApp.activate(ignoringOtherApps: true)
-            popover.show(relativeTo: btn.bounds, of: btn, preferredEdge: .minY)
-            popover.contentViewController?.view.window?.makeKey()
-            // Size popover to fit content with a sensible minimum width
-            if let view = popover.contentViewController?.view {
-                view.layoutSubtreeIfNeeded()
-                let fit = view.fittingSize
-                let minWidth: CGFloat = 350
-                popover.contentSize = NSSize(width: max(minWidth, fit.width), height: fit.height)
-            }
+            showSettings()
         }
     }
-    
-    
+
+    func hidePreviewWindow() {
+        previewWindow.hide()
+    }
+
+    func showSettings() {
+        previewWindow.hide()
+        guard let btn = statusItem.button else { return }
+        NSApp.activate(ignoringOtherApps: true)
+        popover.show(relativeTo: btn.bounds, of: btn, preferredEdge: .minY)
+        popover.contentViewController?.view.window?.makeKey()
+        // Size popover to fit content with a sensible minimum width
+        if let view = popover.contentViewController?.view {
+            view.layoutSubtreeIfNeeded()
+            let fit = view.fittingSize
+            let minWidth: CGFloat = 350
+            popover.contentSize = NSSize(width: max(minWidth, fit.width), height: fit.height)
+        }
+    }
+
+
     // Handle mouse movement: show/hide the preview
     func mouseMoved(to corner: Corner?) {
         let loc = NSEvent.mouseLocation
@@ -120,35 +141,49 @@ class AppDelegate: NSObject, NSApplicationDelegate, HotCornerDelegate {
             return
         }
         // Update only when the corner changes
-        
-        
+
+
         let s = settings
         let active = (corner == .topLeft && s.topLeft)
         || (corner == .topRight && s.topRight)
         || (corner == .bottomLeft && s.bottomLeft)
         || (corner == .bottomRight && s.bottomRight)
-        
+
         if active, let corner = corner {
             // Entered a corner — cancel hide timer
             hideTimer?.invalidate()
             hideTimer = nil
-            
-            // Show or reposition the preview window
-            previewWindow.show(
-                for: corner,
-                content: loadContent(),
-                maxLines: s.previewLines,
-                fileURL: s.fileURL
-            )
+
+            if s.quickNoteMode {
+                if !previewWindow.isVisible {
+                    previewWindow.resetQuickNoteText()
+                }
+                previewWindow.show(
+                    for: corner,
+                    content: "",
+                    maxLines: s.previewLines,
+                    fileURL: nil
+                )
+            } else {
+                // Show or reposition the preview window
+                previewWindow.show(
+                    for: corner,
+                    content: loadContent(),
+                    maxLines: s.previewLines,
+                    fileURL: s.fileURL
+                )
+            }
         } else {
             // On exit — start a one‑shot hide timer
-            hideTimer?.invalidate()
-            hideTimer = Timer.scheduledTimer(withTimeInterval: Constants.hideDelay, repeats: false) { [weak self] _ in
-                self?.previewWindow.hide()
+            if !s.quickNoteMode {
+                hideTimer?.invalidate()
+                hideTimer = Timer.scheduledTimer(withTimeInterval: Constants.hideDelay, repeats: false) { [weak self] _ in
+                    self?.previewWindow.hide()
+                }
             }
         }
     }
-    
+
     func applicationWillTerminate(_ notification: Notification) {
         monitor.stop()
         settings.saveSettings()

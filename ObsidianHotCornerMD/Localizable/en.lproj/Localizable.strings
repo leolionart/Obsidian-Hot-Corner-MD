@@ -18,3 +18,14 @@
 "settings.viewOnGitHub" = "View on GitHub";
 "settings.quit" = "Quit";
 "app.settings" = "Settings";
+
+"settings.quickNoteMode" = "Quick Note Mode";
+"settings.enableQuickNote" = "Enable Quick Note Mode";
+"settings.chooseFolder" = "Choose Folder…";
+"quicknote.title" = "Quick Note";
+"quicknote.cancel" = "Cancel";
+"quicknote.save" = "Save";
+"quicknote.placeholder" = "Type your note here...";
+"quicknote.saveFailed" = "Failed to save quick note: %@";
+"quicknote.noFolderConfigure" = "Please configure a destination folder in Settings";
+"quicknote.configureNow" = "Configure…";

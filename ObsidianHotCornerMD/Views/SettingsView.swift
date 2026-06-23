@@ -1,26 +1,27 @@
 import SwiftUI
 import Foundation
 import KeyboardShortcuts
+import AppKit
 
 
 struct SettingsView: View {
     @ObservedObject var model: SettingsModel
     @State private var showingImporter = false
-    
+
     private func screenWidth() -> Double {
         Double(NSScreen.main?.visibleFrame.width ?? 800)
     }
-    
-    
+
+
     private let cornerColumns = [
         GridItem(.flexible()),
         GridItem(.flexible())
     ]
-    
+
     var body: some View {
-        
+
         VStack(alignment: .leading, spacing: 20) {
-            
+
             GroupBox(label: Label(LocalizedStringKey("settings.markdownFile"), systemImage: "doc.text")) {
                 HStack {
                     Text(model.fileURL?.pathRelativeToHome ?? NSLocalizedString("settings.none", comment: ""))
@@ -38,12 +39,40 @@ struct SettingsView: View {
                         }
                     }
                 }
+            }
+            .frame(maxWidth: .infinity)
+
+            GroupBox(label: Label(LocalizedStringKey("settings.quickNoteMode"), systemImage: "note.text.badge.plus")) {
+                VStack(alignment: .leading, spacing: 10) {
+                    Toggle(LocalizedStringKey("settings.enableQuickNote"), isOn: $model.quickNoteMode)
+
+                    if model.quickNoteMode {
+                        HStack {
+                            Text(model.quickNoteFolderURL?.pathRelativeToHome ?? NSLocalizedString("settings.none", comment: ""))
+                                .lineLimit(1)
+                                .truncationMode(.middle)
+                            Spacer()
+                            Button(LocalizedStringKey("settings.chooseFolder")) {
+                                let panel = NSOpenPanel()
+                                panel.canChooseFiles = false
+                                panel.canChooseDirectories = true
+                                panel.allowsMultipleSelection = false
+                                panel.begin { response in
+                                    if response == .OK, let url = panel.url {
+                                        model.quickNoteFolderURL = url
+                                    }
+                                }
+                            }
+                        }
+                        .padding(.vertical, 5)
+                    }
+                }
                 .padding(.vertical, 5)
                 .frame(maxWidth: .infinity)
             }
             .frame(maxWidth: .infinity)
-            
-            
+
+
             GroupBox(label: Label(LocalizedStringKey("settings.previewLines"), systemImage: "text.alignleft")) {
                 HStack {
                     Slider(
@@ -61,8 +90,8 @@ struct SettingsView: View {
                 .frame(maxWidth: .infinity)
             }
             .frame(maxWidth: .infinity)
-            
-            
+
+
             GroupBox(label: Label(LocalizedStringKey("settings.previewWidth"), systemImage: "arrow.left.and.right")) {
                 HStack {
                     Slider(
@@ -80,8 +109,8 @@ struct SettingsView: View {
                 .frame(maxWidth: .infinity)
             }
             .frame(maxWidth: .infinity)
-            
-            
+
+
             GroupBox(label: Label(LocalizedStringKey("settings.hotCorners"), systemImage: "rectangle.portrait.inset.filled")) {
                 VStack(spacing: 10) {
                     HStack(spacing: 10) {
@@ -101,23 +130,23 @@ struct SettingsView: View {
                 .frame(maxWidth: .infinity)
             }
             .frame(maxWidth: .infinity)
-            
-            
+
+
             GroupBox(label: Label(LocalizedStringKey("settings.behavior"), systemImage: "gearshape")) {
                 VStack(alignment: .leading) {
                     Toggle(LocalizedStringKey("settings.openInObsidian"), isOn: $model.openOnClick)
                     Toggle(LocalizedStringKey("settings.openAtLogin"), isOn: $model.launchAtLogin)
                     Toggle(LocalizedStringKey("settings.enableShortcut"), isOn: $model.shortcutEnabled)
-                    
+
                     if model.shortcutEnabled {
                         HStack {
                             Text(LocalizedStringKey("settings.shortcut"))
                             KeyboardShortcuts.Recorder(for: .togglePreview)
-                            
+
                             Spacer()
                         }
                         .padding(.vertical, 5)
-                        
+
                         Picker("", selection: $model.shortcutCorner) {
                             ForEach(Corner.allCases, id: \.rawValue) { corner in
                                 Text(corner.rawValue.capitalized).tag(corner)
@@ -127,14 +156,14 @@ struct SettingsView: View {
                         .labelsHidden()
                         .padding(.vertical, 5)
                     }
-                    
-                    
+
+
                 }
                 .padding(.vertical, 5)
                 .frame(maxWidth: .infinity, alignment: .leading)
             }
             .frame(maxWidth: .infinity)
-            
+
             Button {
                 if let url = URL(string: "https://github.com/nbox/ObsidianHotCornerMD") {
                     NSWorkspace.shared.open(url)
@@ -153,8 +182,8 @@ struct SettingsView: View {
                 .cornerRadius(8)
             }
             .buttonStyle(PlainButtonStyle())
-            
-            
+
+
             GroupBox {
                 Button(role: .destructive) {
                     NSApp.terminate(nil)

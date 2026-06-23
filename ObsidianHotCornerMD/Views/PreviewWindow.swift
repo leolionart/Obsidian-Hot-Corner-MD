@@ -7,11 +7,16 @@ class PreviewWindow: NSWindow {
     private let viewModel = PreviewViewModel()
     private let settings: SettingsModel
     private let hosting: NSHostingView<PreviewContentView>
-    
-    
-    override var canBecomeKey: Bool { false }
-    override var canBecomeMain: Bool { false }
-    
+
+
+    override var canBecomeKey: Bool { settings.quickNoteMode }
+    override var canBecomeMain: Bool { settings.quickNoteMode }
+
+    func resetQuickNoteText() {
+        viewModel.quickNoteText = ""
+        viewModel.quickNoteError = nil
+    }
+
     init(settings: SettingsModel) {
         self.settings = settings
         hosting = NSHostingView(
@@ -23,15 +28,15 @@ class PreviewWindow: NSWindow {
             backing: .buffered,
             defer: false
         )
-        
+
         isOpaque = false
         backgroundColor = .clear
         hasShadow = true
         level = .floating
-        
+
         contentView?.wantsLayer = true
         contentView?.layer?.cornerRadius = Constants.cornerRadius
-        
+
         hosting.translatesAutoresizingMaskIntoConstraints = false
         contentView?.addSubview(hosting)
         NSLayoutConstraint.activate([
@@ -41,7 +46,7 @@ class PreviewWindow: NSWindow {
             hosting.bottomAnchor.constraint(equalTo: contentView!.bottomAnchor),
         ])
     }
-    
+
     /**
      Shows preview for given angle.
      - Parameters:
@@ -51,18 +56,26 @@ class PreviewWindow: NSWindow {
      - fileURL: URL of file to open. If nil - only text is shown without clickability.
      */
     func show(for corner: Corner, content: String, maxLines: Int, fileURL: URL? = nil) {
+        styleMask = settings.quickNoteMode ? [.borderless] : [.borderless, .nonactivatingPanel]
+
         // Update only when values change to avoid re-rendering during animations
         if viewModel.text != content { viewModel.text = content }
         if viewModel.fileURL != fileURL { viewModel.fileURL = fileURL }
-        
+
         // Compute content height
-        let lineHeight: CGFloat = 17
-        let rawHeight = CGFloat(maxLines) * lineHeight + 2 * Constants.textPadding
+        let height: CGFloat
+        if settings.quickNoteMode {
+            height = 250
+        } else {
+            let lineHeight: CGFloat = 17
+            let rawHeight = CGFloat(maxLines) * lineHeight + 2 * Constants.textPadding
+            height = rawHeight + 2 * Constants.scrollPadding
+        }
         let currentScreen = NSScreen.screens.first { $0.frame.contains(NSEvent.mouseLocation) }
         let screenH = currentScreen?.visibleFrame.height ?? 800
-        contentHeight = min(rawHeight + 2 * Constants.scrollPadding,
+        contentHeight = min(height,
                             screenH - 2 * Constants.scrollPadding)
-        
+
         // Position on the screen under the cursor; width comes from settings
         guard let screen = currentScreen else { return }
         let sf = screen.visibleFrame
@@ -84,20 +97,20 @@ class PreviewWindow: NSWindow {
             x = sf.maxX - width - padding
             y = sf.minY + contentHeight + padding
         }
-        
+
         let frame = NSRect(
             x: x,
             y: y - contentHeight,
             width: width,
             height: contentHeight
         )
-        
-        
+
+
         // If visible and frame unchanged, bail out
         if isVisible && frame == self.frame {
             return
         }
-        
+
         // If visible and the frame changed, animate the move
         if isVisible {
             NSAnimationContext.runAnimationGroup { ctx in
@@ -114,11 +127,15 @@ class PreviewWindow: NSWindow {
                 ctx.duration = Constants.fadeDuration
                 self.animator().alphaValue = 1
             }
+            if settings.quickNoteMode {
+                makeKeyAndOrderFront(nil)
+                NSApp.activate(ignoringOtherApps: true)
+            }
         }
-        
-        
+
+
     }
-    
+
     func hide() {
         guard isVisible && alphaValue > 0.5 else { return }
         NSAnimationContext.runAnimationGroup({ ctx in
