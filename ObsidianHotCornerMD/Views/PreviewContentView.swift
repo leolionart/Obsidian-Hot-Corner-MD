@@ -387,6 +387,14 @@ struct MarkdownEditingTextView: NSViewRepresentable {
 final class MarkdownNSTextView: NSTextView {
     var onPasteImage: ((NSImage) -> String?)?
 
+    override func cancelOperation(_ sender: Any?) {
+        if let appDelegate = NSApp.delegate as? AppDelegate {
+            appDelegate.hidePreviewWindow()
+        } else {
+            super.cancelOperation(sender)
+        }
+    }
+
     override func insertNewline(_ sender: Any?) {
         guard let listPrefix = continuedListPrefix() else {
             super.insertNewline(sender)

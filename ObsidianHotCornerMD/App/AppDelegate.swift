@@ -19,6 +19,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, HotCornerDelegate {
     private var previewWindow: PreviewWindow!
     private var hideTimer: Timer?
     private var suppressQuickNoteUntilCornerExit = false
+    private var suppressQuickNoteUntil = Date.distantPast
     // Cache file contents to avoid re-reading during animations
     private var cachedText: String = ""
     private var cachedURL: URL?
@@ -130,6 +131,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, HotCornerDelegate {
     func hidePreviewWindow() {
         if settings.quickNoteMode {
             suppressQuickNoteUntilCornerExit = true
+            suppressQuickNoteUntil = Date().addingTimeInterval(0.75)
             hideTimer?.invalidate()
             hideTimer = nil
         }
@@ -156,7 +158,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, HotCornerDelegate {
     func mouseMoved(to corner: Corner?) {
         let loc = NSEvent.mouseLocation
         // Ignore if the pointer is over the preview window
-        if previewWindow.frame.contains(loc) {
+        if previewWindow.frame.contains(loc) && !settings.quickNoteMode {
             return
         }
         // Update only when the corner changes
@@ -177,7 +179,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, HotCornerDelegate {
             hideTimer?.invalidate()
             hideTimer = nil
 
-            if s.quickNoteMode && suppressQuickNoteUntilCornerExit {
+            if s.quickNoteMode && (suppressQuickNoteUntilCornerExit || Date() < suppressQuickNoteUntil) {
                 return
             }
 

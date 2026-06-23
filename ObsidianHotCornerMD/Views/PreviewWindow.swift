@@ -12,6 +12,14 @@ class PreviewWindow: NSWindow {
     override var canBecomeKey: Bool { settings.quickNoteMode }
     override var canBecomeMain: Bool { settings.quickNoteMode }
 
+    override func cancelOperation(_ sender: Any?) {
+        if settings.quickNoteMode, let appDelegate = NSApp.delegate as? AppDelegate {
+            appDelegate.hidePreviewWindow()
+        } else {
+            super.cancelOperation(sender)
+        }
+    }
+
     func resetQuickNoteText() {
         viewModel.quickNoteText = ""
         viewModel.quickNoteError = nil
@@ -121,15 +129,17 @@ class PreviewWindow: NSWindow {
         // If hidden, set frame and fade in
         else {
             setFrame(frame, display: false)
-            alphaValue = 0
-            orderFrontRegardless()
-            NSAnimationContext.runAnimationGroup { ctx in
-                ctx.duration = Constants.fadeDuration
-                self.animator().alphaValue = 1
-            }
             if settings.quickNoteMode {
+                alphaValue = 1
                 makeKeyAndOrderFront(nil)
                 NSApp.activate(ignoringOtherApps: true)
+            } else {
+                alphaValue = 0
+                orderFrontRegardless()
+                NSAnimationContext.runAnimationGroup { ctx in
+                    ctx.duration = Constants.fadeDuration
+                    self.animator().alphaValue = 1
+                }
             }
         }
 
@@ -147,6 +157,7 @@ class PreviewWindow: NSWindow {
     }
 
     func hideImmediately() {
+        contentView?.layer?.removeAllAnimations()
         alphaValue = 0
         orderOut(nil)
     }
