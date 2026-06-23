@@ -23,14 +23,7 @@ class UpdateChecker {
     // Configurable repository (defaults to leolionart/Obsidian-Hot-Corner-MD)
     var repository: String = "leolionart/Obsidian-Hot-Corner-MD"
 
-    var allowPrereleases: Bool = {
-        let currentVersion = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "0.0.0"
-        let hasPrereleaseSuffix = currentVersion.contains("-") ||
-                                  currentVersion.lowercased().contains("beta") ||
-                                  currentVersion.lowercased().contains("alpha") ||
-                                  currentVersion.lowercased().contains("rc")
-        return UserDefaults.standard.bool(forKey: "allowPrereleases") || hasPrereleaseSuffix
-    }()
+    var allowPrereleases: Bool = true
 
     private var githubAPIURL: String {
         return "https://api.github.com/repos/\(repository)/releases"

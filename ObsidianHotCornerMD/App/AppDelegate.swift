@@ -18,6 +18,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, HotCornerDelegate {
 
     private var previewWindow: PreviewWindow!
     private var hideTimer: Timer?
+    private var suppressQuickNoteUntilCornerExit = false
     // Cache file contents to avoid re-reading during animations
     private var cachedText: String = ""
     private var cachedURL: URL?
@@ -127,6 +128,11 @@ class AppDelegate: NSObject, NSApplicationDelegate, HotCornerDelegate {
     }
 
     func hidePreviewWindow() {
+        if settings.quickNoteMode {
+            suppressQuickNoteUntilCornerExit = true
+            hideTimer?.invalidate()
+            hideTimer = nil
+        }
         previewWindow.hideImmediately()
     }
 
@@ -162,10 +168,18 @@ class AppDelegate: NSObject, NSApplicationDelegate, HotCornerDelegate {
         || (corner == .bottomLeft && s.bottomLeft)
         || (corner == .bottomRight && s.bottomRight)
 
+        if !active {
+            suppressQuickNoteUntilCornerExit = false
+        }
+
         if active, let corner = corner {
             // Entered a corner — cancel hide timer
             hideTimer?.invalidate()
             hideTimer = nil
+
+            if s.quickNoteMode && suppressQuickNoteUntilCornerExit {
+                return
+            }
 
             if s.quickNoteMode {
                 if !previewWindow.isVisible {
