@@ -1,3 +1,4 @@
+import AppKit
 import Foundation
 
 extension URL {
@@ -55,13 +56,35 @@ struct FileHelper {
         return fileURL
     }
 
+    static func savePastedImage(_ image: NSImage, in folderURL: URL, date: Date = Date()) throws -> String {
+        let attachmentsURL = folderURL.appendingPathComponent("attachments", isDirectory: true)
+        try FileManager.default.createDirectory(
+            at: attachmentsURL,
+            withIntermediateDirectories: true
+        )
+
+        let baseName = "image-\(fileDateFormatter.string(from: date))"
+        let imageURL = uniqueFileURL(in: attachmentsURL, baseName: baseName, fileExtension: "png")
+
+        guard let pngData = image.pngData else {
+            throw CocoaError(.fileWriteUnknown)
+        }
+
+        try pngData.write(to: imageURL, options: .atomic)
+        return "attachments/\(imageURL.lastPathComponent)"
+    }
+
     private static func uniqueFileURL(in folderURL: URL, baseName: String) -> URL {
+        uniqueFileURL(in: folderURL, baseName: baseName, fileExtension: "md")
+    }
+
+    private static func uniqueFileURL(in folderURL: URL, baseName: String, fileExtension: String) -> URL {
         let manager = FileManager.default
-        var candidate = folderURL.appendingPathComponent("\(baseName).md")
+        var candidate = folderURL.appendingPathComponent("\(baseName).\(fileExtension)")
         var index = 2
 
         while manager.fileExists(atPath: candidate.path) {
-            candidate = folderURL.appendingPathComponent("\(baseName)-\(index).md")
+            candidate = folderURL.appendingPathComponent("\(baseName)-\(index).\(fileExtension)")
             index += 1
         }
 
@@ -85,5 +108,16 @@ struct FileHelper {
             .prefix(80)
 
         return "# \(title)\n\n\(body)\n"
+    }
+}
+
+private extension NSImage {
+    var pngData: Data? {
+        guard let tiffRepresentation,
+              let bitmap = NSBitmapImageRep(data: tiffRepresentation) else {
+            return nil
+        }
+
+        return bitmap.representation(using: .png, properties: [:])
     }
 }

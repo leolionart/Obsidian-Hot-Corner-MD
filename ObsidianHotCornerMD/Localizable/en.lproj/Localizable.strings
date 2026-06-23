@@ -26,6 +26,9 @@
 "quicknote.cancel" = "Cancel";
 "quicknote.save" = "Save";
 "quicknote.placeholder" = "Type your note here...";
+"quicknote.destination" = "Destination";
+"quicknote.pasteHint" = "Paste images with Cmd+V";
+"quicknote.imagePasteFailed" = "Failed to paste image: %@";
 "quicknote.saveFailed" = "Failed to save quick note: %@";
 "quicknote.noFolderConfigure" = "Please configure a destination folder in Settings";
 "quicknote.configureNow" = "Configure…";

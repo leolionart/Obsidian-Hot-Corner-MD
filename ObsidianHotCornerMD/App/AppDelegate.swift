@@ -127,7 +127,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, HotCornerDelegate {
     }
 
     func hidePreviewWindow() {
-        previewWindow.hide()
+        previewWindow.hideImmediately()
     }
 
     func showSettings() {

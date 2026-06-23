@@ -65,7 +65,7 @@ class PreviewWindow: NSWindow {
         // Compute content height
         let height: CGFloat
         if settings.quickNoteMode {
-            height = 250
+            height = 540
         } else {
             let lineHeight: CGFloat = 17
             let rawHeight = CGFloat(maxLines) * lineHeight + 2 * Constants.textPadding
@@ -80,7 +80,7 @@ class PreviewWindow: NSWindow {
         guard let screen = currentScreen else { return }
         let sf = screen.visibleFrame
         let padding = Constants.scrollPadding
-        let width = CGFloat(settings.previewWidth)
+        let width = settings.quickNoteMode ? max(CGFloat(settings.previewWidth), 760) : CGFloat(settings.previewWidth)
         let x: CGFloat, y: CGFloat
         switch corner {
         case .topLeft:
@@ -144,5 +144,10 @@ class PreviewWindow: NSWindow {
         }) {
             self.orderOut(nil)
         }
+    }
+
+    func hideImmediately() {
+        alphaValue = 0
+        orderOut(nil)
     }
 }

@@ -6,52 +6,34 @@ struct PreviewContentView: View {
     @ObservedObject var viewModel: PreviewViewModel
     let settings: SettingsModel
 
+    private var contentWidth: CGFloat {
+        settings.quickNoteMode ? max(CGFloat(settings.previewWidth), 760) : CGFloat(settings.previewWidth)
+    }
+
     var body: some View {
         Group {
             if settings.quickNoteMode {
                 quickNoteView
-            } else {
-                // If a valid file is set
-                if let url = viewModel.fileURL,
-                   FileManager.default.fileExists(atPath: url.path) {
-
-                    // Show Markdown
-                    ScrollView(.vertical) {
-                        Markdown(viewModel.text)
-                            .markdownTheme(.gitHub)
-                            .padding(Constants.textPadding)
-                    }
-
-                } else {
-                    // Placeholder when no file is selected
-                    Text(LocalizedStringKey("placeholder.pleaseSelectFile"))
-                        .foregroundColor(.gray)
-                        .font(.system(size: 16, weight: .medium))
-                        .multilineTextAlignment(.center)
-                        .padding()
-                        .frame(maxWidth: .infinity, maxHeight: .infinity)
-                        .clipShape(
-                            RoundedRectangle(
-                                cornerRadius: Constants.cornerRadius,
-                                style: .continuous
-                            )
-                        )
+            } else if let url = viewModel.fileURL,
+                      FileManager.default.fileExists(atPath: url.path) {
+                ScrollView(.vertical) {
+                    Markdown(viewModel.text)
+                        .markdownTheme(.gitHub)
+                        .padding(Constants.textPadding)
                 }
+            } else {
+                Text(LocalizedStringKey("placeholder.pleaseSelectFile"))
+                    .foregroundColor(.gray)
+                    .font(.system(size: 16, weight: .medium))
+                    .multilineTextAlignment(.center)
+                    .padding()
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
         }
-        .padding(Constants.scrollPadding)
-        .frame(
-            minWidth: CGFloat(settings.previewWidth),
-            maxWidth: CGFloat(settings.previewWidth),
-            alignment: .leading
-        )
+        .padding(settings.quickNoteMode ? 0 : Constants.scrollPadding)
+        .frame(minWidth: contentWidth, maxWidth: contentWidth, alignment: .leading)
         .background(Color(red: 24.0/255.0, green: 25.0/255.0, blue: 29.0/255.0, opacity: 1.0))
-        .clipShape(
-            RoundedRectangle(
-                cornerRadius: Constants.cornerRadius,
-                style: .continuous
-            )
-        )
+        .clipShape(RoundedRectangle(cornerRadius: Constants.cornerRadius, style: .continuous))
         .contentShape(Rectangle())
         .onTapGesture {
             guard !settings.quickNoteMode else { return }
@@ -68,39 +50,33 @@ struct PreviewContentView: View {
     @ViewBuilder
     private var quickNoteView: some View {
         if let folderURL = settings.quickNoteFolderURL {
-            VStack(alignment: .leading, spacing: 8) {
-                HStack {
-                    Image(systemName: "square.and.pencil")
-                        .foregroundColor(.blue)
-                    Text(LocalizedStringKey("quicknote.title"))
-                        .font(.system(size: 14, weight: .bold))
-                        .foregroundColor(.white)
-                    Spacer()
-                }
+            VStack(alignment: .leading, spacing: 12) {
+                quickNoteHeader(folderURL: folderURL)
 
                 ZStack(alignment: .topLeading) {
-                    if #available(macOS 13.0, *) {
-                        TextEditor(text: $viewModel.quickNoteText)
-                            .font(.system(size: 13))
-                            .scrollContentBackground(.hidden)
-                            .background(Color(white: 0.15))
-                            .cornerRadius(4)
-                    } else {
-                        TextEditor(text: $viewModel.quickNoteText)
-                            .font(.system(size: 13))
-                            .cornerRadius(4)
-                    }
+                    MarkdownEditingTextView(
+                        text: $viewModel.quickNoteText,
+                        onPasteImage: { image in
+                            pasteImage(image, folderURL: folderURL)
+                        }
+                    )
 
                     if viewModel.quickNoteText.isEmpty {
                         Text(LocalizedStringKey("quicknote.placeholder"))
-                            .foregroundColor(.gray)
-                            .font(.system(size: 13))
-                            .padding(.horizontal, 5)
-                            .padding(.vertical, 8)
+                            .foregroundColor(.white.opacity(0.34))
+                            .font(.system(size: 16, design: .monospaced))
+                            .padding(.horizontal, 18)
+                            .padding(.vertical, 16)
                             .allowsHitTesting(false)
                     }
                 }
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .frame(maxWidth: .infinity, minHeight: 380, maxHeight: .infinity)
+                .background(Color(red: 31.0/255.0, green: 33.0/255.0, blue: 38.0/255.0))
+                .clipShape(RoundedRectangle(cornerRadius: 9, style: .continuous))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 9, style: .continuous)
+                        .stroke(Color.white.opacity(0.08), lineWidth: 1)
+                )
 
                 if let error = viewModel.quickNoteError {
                     Text(error)
@@ -109,67 +85,129 @@ struct PreviewContentView: View {
                         .lineLimit(2)
                 }
 
-                HStack {
-                    Button(action: {
-                        viewModel.quickNoteText = ""
-                        viewModel.quickNoteError = nil
-                        if let appDelegate = NSApp.delegate as? AppDelegate {
-                            appDelegate.hidePreviewWindow()
-                        }
-                    }) {
-                        Text(LocalizedStringKey("quicknote.cancel"))
-                            .font(.system(size: 12, weight: .medium))
-                            .foregroundColor(.gray)
-                            .padding(.horizontal, 12)
-                            .padding(.vertical, 6)
-                            .background(Color.white.opacity(0.1))
-                            .cornerRadius(6)
-                    }
-                    .buttonStyle(PlainButtonStyle())
-
-                    Spacer()
-
-                    Button(action: {
-                        saveQuickNote()
-                    }) {
-                        Text(LocalizedStringKey("quicknote.save"))
-                            .font(.system(size: 12, weight: .semibold))
-                            .foregroundColor(.white)
-                            .padding(.horizontal, 16)
-                            .padding(.vertical, 6)
-                            .background(Color.blue)
-                            .cornerRadius(6)
-                    }
-                    .disabled(viewModel.quickNoteText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
-                    .buttonStyle(PlainButtonStyle())
-                }
-                .padding(.top, 4)
+                quickNoteFooter
             }
-            .padding(Constants.textPadding)
+            .padding(16)
         } else {
-            VStack(spacing: 12) {
-                Image(systemName: "folder.badge.questionmark")
-                    .font(.system(size: 32))
-                    .foregroundColor(.yellow)
-                Text(LocalizedStringKey("quicknote.noFolderConfigure"))
-                    .foregroundColor(.gray)
-                    .font(.system(size: 14, weight: .medium))
-                    .multilineTextAlignment(.center)
-                Button(action: {
-                    if let appDelegate = NSApp.delegate as? AppDelegate {
-                        appDelegate.showSettings()
-                    }
-                }) {
-                    Text(LocalizedStringKey("quicknote.configureNow"))
-                        .foregroundColor(.white)
-                        .padding(.horizontal, 16)
-                        .padding(.vertical, 6)
-                        .background(Color.blue)
-                        .cornerRadius(6)
-                }
-                .buttonStyle(PlainButtonStyle())
+            missingFolderView
+        }
+    }
+
+    private func quickNoteHeader(folderURL: URL) -> some View {
+        HStack(alignment: .firstTextBaseline) {
+            Image(systemName: "square.and.pencil")
+                .font(.system(size: 18, weight: .semibold))
+                .foregroundColor(.accentColor)
+            Text(LocalizedStringKey("quicknote.title"))
+                .font(.system(size: 20, weight: .bold))
+                .foregroundColor(.white)
+            Spacer()
+            VStack(alignment: .trailing, spacing: 2) {
+                Text(LocalizedStringKey("quicknote.destination"))
+                    .font(.system(size: 10, weight: .semibold))
+                    .foregroundColor(.white.opacity(0.45))
+                Text(folderURL.pathRelativeToHome)
+                    .font(.system(size: 11))
+                    .foregroundColor(.white.opacity(0.65))
+                    .lineLimit(1)
+                    .truncationMode(.middle)
+                    .frame(maxWidth: 310, alignment: .trailing)
             }
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
+        }
+    }
+
+    private var quickNoteFooter: some View {
+        HStack {
+            Text(String(format: NSLocalizedString("quicknote.wordCount", comment: ""), wordCount))
+                .font(.system(size: 11, weight: .medium))
+                .foregroundColor(.white.opacity(0.45))
+
+            Text(LocalizedStringKey("quicknote.pasteHint"))
+                .font(.system(size: 11, weight: .medium))
+                .foregroundColor(.white.opacity(0.35))
+
+            Spacer()
+
+            Button(action: cancelQuickNote) {
+                Text(LocalizedStringKey("quicknote.cancel"))
+                    .font(.system(size: 12, weight: .medium))
+                    .foregroundColor(.white.opacity(0.68))
+                    .padding(.horizontal, 14)
+                    .padding(.vertical, 8)
+                    .background(Color.white.opacity(0.10))
+                    .cornerRadius(7)
+            }
+            .buttonStyle(.plain)
+            .keyboardShortcut(.cancelAction)
+
+            Button(action: saveQuickNote) {
+                Text(LocalizedStringKey("quicknote.save"))
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundColor(.white)
+                    .padding(.horizontal, 18)
+                    .padding(.vertical, 8)
+                    .background(Color.accentColor)
+                    .cornerRadius(7)
+            }
+            .disabled(viewModel.quickNoteText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+            .opacity(viewModel.quickNoteText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? 0.5 : 1)
+            .buttonStyle(.plain)
+            .keyboardShortcut(.defaultAction)
+        }
+    }
+
+    private var missingFolderView: some View {
+        VStack(spacing: 12) {
+            Image(systemName: "folder.badge.questionmark")
+                .font(.system(size: 32))
+                .foregroundColor(.yellow)
+            Text(LocalizedStringKey("quicknote.noFolderConfigure"))
+                .foregroundColor(.gray)
+                .font(.system(size: 14, weight: .medium))
+                .multilineTextAlignment(.center)
+            Button(action: {
+                if let appDelegate = NSApp.delegate as? AppDelegate {
+                    appDelegate.showSettings()
+                }
+            }) {
+                Text(LocalizedStringKey("quicknote.configureNow"))
+                    .foregroundColor(.white)
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 6)
+                    .background(Color.blue)
+                    .cornerRadius(6)
+            }
+            .buttonStyle(.plain)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .padding(24)
+    }
+
+    private var wordCount: Int {
+        viewModel.quickNoteText
+            .split { $0.isWhitespace || $0.isNewline }
+            .count
+    }
+
+    private func pasteImage(_ image: NSImage, folderURL: URL) -> String? {
+        do {
+            let relativePath = try FileHelper.savePastedImage(image, in: folderURL)
+            viewModel.quickNoteError = nil
+            return "\n![](\(relativePath))\n"
+        } catch {
+            viewModel.quickNoteError = String(
+                format: NSLocalizedString("quicknote.imagePasteFailed", comment: ""),
+                error.localizedDescription
+            )
+            return nil
+        }
+    }
+
+    private func cancelQuickNote() {
+        viewModel.quickNoteText = ""
+        viewModel.quickNoteError = nil
+        if let appDelegate = NSApp.delegate as? AppDelegate {
+            appDelegate.hidePreviewWindow()
         }
     }
 
@@ -182,12 +220,10 @@ struct PreviewContentView: View {
             viewModel.quickNoteText = ""
             viewModel.quickNoteError = nil
 
-            // Hide the preview window
             if let appDelegate = NSApp.delegate as? AppDelegate {
                 appDelegate.hidePreviewWindow()
             }
 
-            // Optionally open in Obsidian if openOnClick is enabled
             if settings.openOnClick, let obsidianURL = savedFileURL.obsidianOpenURL {
                 NSWorkspace.shared.open(obsidianURL)
             }
@@ -197,5 +233,187 @@ struct PreviewContentView: View {
                 error.localizedDescription
             )
         }
+    }
+}
+
+struct MarkdownEditingTextView: NSViewRepresentable {
+    @Binding var text: String
+    var onPasteImage: (NSImage) -> String?
+
+    func makeCoordinator() -> Coordinator {
+        Coordinator(text: $text)
+    }
+
+    func makeNSView(context: Context) -> NSScrollView {
+        let scrollView = NSScrollView()
+        scrollView.drawsBackground = false
+        scrollView.hasVerticalScroller = true
+        scrollView.autohidesScrollers = true
+        scrollView.borderType = .noBorder
+
+        let textView = MarkdownNSTextView()
+        textView.delegate = context.coordinator
+        textView.onPasteImage = onPasteImage
+        textView.isRichText = true
+        textView.importsGraphics = false
+        textView.isEditable = true
+        textView.isSelectable = true
+        textView.allowsUndo = true
+        textView.drawsBackground = false
+        textView.textContainerInset = NSSize(width: 12, height: 12)
+        textView.textContainer?.widthTracksTextView = true
+        textView.textContainer?.containerSize = NSSize(width: scrollView.contentSize.width, height: .greatestFiniteMagnitude)
+        textView.minSize = NSSize(width: 0, height: scrollView.contentSize.height)
+        textView.maxSize = NSSize(width: CGFloat.greatestFiniteMagnitude, height: CGFloat.greatestFiniteMagnitude)
+        textView.isVerticallyResizable = true
+        textView.isHorizontallyResizable = false
+        textView.autoresizingMask = [.width]
+        textView.insertionPointColor = .white
+        textView.string = text
+        context.coordinator.applyMarkdownStyle(to: textView)
+
+        scrollView.documentView = textView
+        return scrollView
+    }
+
+    func updateNSView(_ scrollView: NSScrollView, context: Context) {
+        guard let textView = scrollView.documentView as? MarkdownNSTextView else { return }
+        textView.onPasteImage = onPasteImage
+
+        if textView.string != text {
+            let selectedRanges = textView.selectedRanges
+            textView.string = text
+            textView.selectedRanges = selectedRanges
+        }
+
+        context.coordinator.applyMarkdownStyle(to: textView)
+    }
+
+    final class Coordinator: NSObject, NSTextViewDelegate {
+        @Binding var text: String
+        private var isStyling = false
+
+        init(text: Binding<String>) {
+            _text = text
+        }
+
+        func textDidChange(_ notification: Notification) {
+            guard let textView = notification.object as? NSTextView else { return }
+            text = textView.string
+            applyMarkdownStyle(to: textView)
+        }
+
+        func applyMarkdownStyle(to textView: NSTextView) {
+            guard !isStyling, let textStorage = textView.textStorage else { return }
+            isStyling = true
+
+            let selectedRanges = textView.selectedRanges
+            let fullRange = NSRange(location: 0, length: textStorage.length)
+            let baseFont = NSFont.monospacedSystemFont(ofSize: 15, weight: .regular)
+            let baseColor = NSColor.white.withAlphaComponent(0.92)
+            let paragraphStyle = NSMutableParagraphStyle()
+            paragraphStyle.lineSpacing = 3
+            paragraphStyle.paragraphSpacing = 5
+
+            textStorage.beginEditing()
+            if fullRange.length > 0 {
+                textStorage.setAttributes([
+                    .font: baseFont,
+                    .foregroundColor: baseColor,
+                    .paragraphStyle: paragraphStyle
+                ], range: fullRange)
+            }
+
+            let nsText = textView.string as NSString
+            nsText.enumerateSubstrings(in: fullRange, options: [.byLines, .substringNotRequired]) { _, lineRange, _, _ in
+                guard lineRange.location < textStorage.length else { return }
+                let line = nsText.substring(with: lineRange)
+                let trimmed = line.trimmingCharacters(in: .whitespaces)
+
+                if trimmed.hasPrefix("# ") {
+                    textStorage.addAttributes([
+                        .font: NSFont.systemFont(ofSize: 24, weight: .bold),
+                        .foregroundColor: NSColor.white
+                    ], range: lineRange)
+                } else if trimmed.hasPrefix("## ") {
+                    textStorage.addAttributes([
+                        .font: NSFont.systemFont(ofSize: 20, weight: .bold),
+                        .foregroundColor: NSColor.white
+                    ], range: lineRange)
+                } else if trimmed.hasPrefix("### ") {
+                    textStorage.addAttributes([
+                        .font: NSFont.systemFont(ofSize: 17, weight: .semibold),
+                        .foregroundColor: NSColor.white
+                    ], range: lineRange)
+                } else if trimmed.hasPrefix(">") {
+                    textStorage.addAttributes([
+                        .foregroundColor: NSColor.systemBlue.withAlphaComponent(0.85)
+                    ], range: lineRange)
+                } else if trimmed.hasPrefix("- ") || trimmed.hasPrefix("* ") || trimmed.hasPrefix("- [") {
+                    textStorage.addAttributes([
+                        .foregroundColor: NSColor.white.withAlphaComponent(0.86)
+                    ], range: lineRange)
+                }
+            }
+
+            highlightInline(pattern: "`[^`]+`", in: textStorage, text: textView.string, attributes: [
+                .font: NSFont.monospacedSystemFont(ofSize: 14, weight: .medium),
+                .foregroundColor: NSColor.systemGreen.withAlphaComponent(0.95)
+            ])
+
+            highlightInline(pattern: "\\*\\*([^*]+)\\*\\*", in: textStorage, text: textView.string, attributes: [
+                .font: NSFont.monospacedSystemFont(ofSize: 15, weight: .bold)
+            ])
+
+            highlightInline(pattern: "_([^_]+)_", in: textStorage, text: textView.string, attributes: [
+                .font: NSFontManager.shared.convert(baseFont, toHaveTrait: .italicFontMask)
+            ])
+
+            textStorage.endEditing()
+            textView.selectedRanges = selectedRanges
+            isStyling = false
+        }
+
+        private func highlightInline(pattern: String, in textStorage: NSTextStorage, text: String, attributes: [NSAttributedString.Key: Any]) {
+            guard let regex = try? NSRegularExpression(pattern: pattern) else { return }
+            let range = NSRange(location: 0, length: (text as NSString).length)
+            regex.enumerateMatches(in: text, range: range) { match, _, _ in
+                guard let match else { return }
+                textStorage.addAttributes(attributes, range: match.range)
+            }
+        }
+    }
+}
+
+final class MarkdownNSTextView: NSTextView {
+    var onPasteImage: ((NSImage) -> String?)?
+
+    override func paste(_ sender: Any?) {
+        if let image = pasteboardImage(),
+           let markdown = onPasteImage?(image) {
+            insertText(markdown, replacementRange: selectedRange())
+            return
+        }
+
+        super.paste(sender)
+    }
+
+    private func pasteboardImage() -> NSImage? {
+        let pasteboard = NSPasteboard.general
+
+        if let images = pasteboard.readObjects(forClasses: [NSImage.self], options: nil) as? [NSImage],
+           let image = images.first {
+            return image
+        }
+
+        if let urls = pasteboard.readObjects(forClasses: [NSURL.self], options: nil) as? [NSURL] {
+            for url in urls where url.isFileURL {
+                if let image = NSImage(contentsOf: url as URL) {
+                    return image
+                }
+            }
+        }
+
+        return nil
     }
 }
