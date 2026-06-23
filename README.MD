@@ -6,6 +6,8 @@
 
 A lightweight macOS menu bar app that brings your Obsidian notes to your fingertips-just like “Quick Notes” with active screen corners. Select any `.md` file in the settings, then hover your cursor over one of the screen’s corners. A floating preview window renders your Markdown document on top of all other windows, and a single click opens the note in Obsidian.
 
+Quick Note Mode can turn the same hot-corner interaction into a capture window. Choose a destination folder, enter an enabled hot corner, type a note, and save it as a new timestamped `.md` file in that folder.
+
 ## Demo
 
 <div style="text-align: center;">
@@ -21,8 +23,10 @@ A lightweight macOS menu bar app that brings your Obsidian notes to your fingert
 - **Preview Lines / Width**: Adjust how many lines are shown and the width of the preview window.
 - **Hot Corners**: Enable one or more corners (top-left, top-right, bottom-left, bottom-right).
 - **Click to Open**: Open the note in Obsidian using the `obsidian://` URL scheme.
+- **Quick Note Mode**: Choose a destination folder and create new timestamped Markdown notes from a hot-corner capture window.
 - **Keyboard Shortcut**: Assign a custom shortcut to toggle the preview on and off.
 - **Launch at Login**: Enable “Open at Login,” implemented via a Launch Agent (`~/Library/LaunchAgents`). The app will appear in System Settings → General → Login Items (you can disable it there).
+- **Auto-Updates**: Checks GitHub Releases for new updates, showing a "Software Update" settings section where you can download and install new versions with a single click.
 
 </details>
 

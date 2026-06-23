@@ -1,4 +1,4 @@
-import Foundation 
+import Foundation
 import Combine
 import KeyboardShortcuts
 
@@ -31,11 +31,13 @@ class SettingsModel: ObservableObject {
             UserDefaults.standard.set(shortcutCorner.rawValue, forKey: "shortcutCorner")
         }
     }
-    
-    
+
+    @Published var quickNoteMode: Bool = false
+    @Published var quickNoteFolderURL: URL?
+
     private var cancellables = Set<AnyCancellable>()
     private var isInitializing = true
-    
+
     init() {
         loadSettings()
         let plistExists = FileManager.default.fileExists(atPath: LaunchAgentHelper.plistPath)
@@ -48,7 +50,7 @@ class SettingsModel: ObservableObject {
         .store(in: &cancellables)
         isInitializing = false
     }
-    
+
     private func toggleLaunchAtLogin(_ enabled: Bool) {
         do {
             if enabled {
@@ -60,7 +62,7 @@ class SettingsModel: ObservableObject {
             print("[SettingsModel] Failed to toggle launchAtLogin:", error)
         }
     }
-    
+
     func loadSettings() {
         let defaults = UserDefaults.standard
         let pl = defaults.integer(forKey: "previewLines")
@@ -78,18 +80,23 @@ class SettingsModel: ObservableObject {
         bottomLeft = (defaults.object(forKey: "bottomLeft") as? Bool) ?? false
         bottomRight = (defaults.object(forKey: "bottomRight") as? Bool) ?? false
         openOnClick = defaults.object(forKey: "openOnClick") as? Bool ?? true
-        
+
         shortcutEnabled  = defaults.bool(forKey: "shortcutEnabled")
         if let raw = defaults.string(forKey: "shortcutCorner"),
            let c = Corner(rawValue: raw) {
             shortcutCorner = c
         }
-        
+
         if let path = defaults.string(forKey: "filePath") {
             fileURL = URL(fileURLWithPath: path)
         }
+
+        quickNoteMode = defaults.bool(forKey: "quickNoteMode")
+        if let path = defaults.string(forKey: "quickNoteFolderPath") {
+            quickNoteFolderURL = URL(fileURLWithPath: path)
+        }
     }
-    
+
     func saveSettings() {
         let defaults = UserDefaults.standard
         defaults.set(previewLines, forKey: "previewLines")
@@ -99,13 +106,20 @@ class SettingsModel: ObservableObject {
         defaults.set(bottomLeft, forKey: "bottomLeft")
         defaults.set(bottomRight, forKey: "bottomRight")
         defaults.set(openOnClick, forKey: "openOnClick")
-        
+
         defaults.set(shortcutEnabled,  forKey: "shortcutEnabled")
         defaults.set(shortcutCorner.rawValue, forKey: "shortcutCorner")
-        
+
         if let url = fileURL {
             defaults.set(url.path, forKey: "filePath")
         }
+
+        defaults.set(quickNoteMode, forKey: "quickNoteMode")
+        if let url = quickNoteFolderURL {
+            defaults.set(url.path, forKey: "quickNoteFolderPath")
+        } else {
+            defaults.removeObject(forKey: "quickNoteFolderPath")
+        }
     }
-    
+
 }

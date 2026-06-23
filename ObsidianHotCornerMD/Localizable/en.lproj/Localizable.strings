@@ -18,3 +18,47 @@
 "settings.viewOnGitHub" = "View on GitHub";
 "settings.quit" = "Quit";
 "app.settings" = "Settings";
+
+"settings.quickNoteMode" = "Quick Note Mode";
+"settings.enableQuickNote" = "Enable Quick Note Mode";
+"settings.chooseFolder" = "Choose Folder…";
+"quicknote.title" = "Quick Note";
+"quicknote.cancel" = "Cancel";
+"quicknote.save" = "Save";
+"quicknote.placeholder" = "Type your note here...";
+"quicknote.destination" = "Destination";
+"quicknote.wordCount" = "%d words";
+"quicknote.pasteHint" = "Paste images with Cmd+V";
+"quicknote.imagePasteFailed" = "Failed to paste image: %@";
+"quicknote.saveFailed" = "Failed to save quick note: %@";
+"quicknote.noFolderConfigure" = "Please configure a destination folder in Settings";
+"quicknote.configureNow" = "Configure…";
+
+"settings.softwareUpdate" = "Software Update";
+"update.currentVersion" = "Current Version";
+"update.lastChecked" = "Last Checked";
+"update.checkForUpdates" = "Check for Updates";
+"update.upToDate" = "App is up to date";
+"update.checking" = "Checking for updates…";
+"update.newAvailable" = "Version %@ is available";
+"update.downloadAndInstall" = "Download & Install";
+"update.skip" = "Skip";
+"update.downloading" = "Downloading… %d%%";
+"update.cancel" = "Cancel";
+"update.installing" = "Installing update…";
+
+"error.network" = "Network error: %@";
+"error.invalidResponse" = "Invalid response from server";
+"error.server" = "Server error: %d";
+"error.noData" = "No data received";
+"error.invalidJSON" = "Invalid JSON format";
+"error.noDownloadFile" = "No download file found in release";
+"error.jsonParse" = "JSON parse error: %@";
+"error.unzipFailed" = "Failed to unzip update file";
+"error.noAppInZip" = "No app bundle found in update zip";
+"error.mountDMG" = "Failed to mount DMG: %@";
+"error.parseMount" = "Could not parse mount point: %@";
+"error.noAppInDMG" = "No app bundle found in DMG";
+"error.copyAppFailed" = "Failed to copy app bundle";
+"error.saveUpdate" = "Failed to save update file: %@";
+"error.downloadFailed" = "Download failed: %@";
